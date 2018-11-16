@@ -43,6 +43,7 @@ data DataType = TypeInt
               | TypeFloat
               | TypeDouble
               | TypeVoid
+              | TypeBoolean
         deriving (Show, Eq)
 
 datatype :: String -> DataType
@@ -52,14 +53,19 @@ datatype str
     | str == "float"    = TypeFloat
     | str == "double"   = TypeDouble
     | str == "void"     = TypeVoid
+    | str == "bool"     = TypeBoolean
     | otherwise         = error $ "Unknown data type: " ++ str
 
 showDataType :: DataType -> String
-showDataType TypeInt    = "int"
-showDataType TypeChar   = "char"
-showDataType TypeFloat  = "float"
-showDataType TypeDouble = "double"
-showDataType TypeVoid   = "void"
+showDataType TypeInt     = "int"
+showDataType TypeChar    = "char"
+showDataType TypeFloat   = "float"
+showDataType TypeDouble  = "double"
+showDataType TypeVoid    = "void"
+showDataType TypeBoolean = "bool"
+
+dataTypesList :: [String]
+dataTypesList = ["int","char","float","double","void", "bool"]
     
 data Token = TokenOperator Operator
            | TokenIdentifier String
@@ -90,6 +96,9 @@ alnums str = als "" str
         als acc (c:cs)  | isAlphaNum c =
                             let (acc', cs') = als acc cs
                             in (c:acc', cs')
+                        | c == '_' =
+                            let (acc', cs') = als acc cs
+                            in (c:acc', cs')
                         | otherwise = (acc, c:cs)
 
 identifier :: Char -> String -> [Token]
@@ -97,7 +106,7 @@ identifier c cs =
     let
         (str, cs') = alnums cs
     in
-        if elem (c:str) ["int","char","float","double","void"] then
+        if elem (c:str) dataTypesList then
             TokenDataType (datatype (c:str)) : tokenize cs'
         else
             TokenIdentifier (c:str) : tokenize cs'
@@ -125,11 +134,10 @@ tokenize (c:cs)
 
 main :: IO ()
 main = do
-    print $ tokenize " 1 + 4 / x"
-    print $ tokenize "!x"
-    print $ tokenize "y=8^2"
-    print $ tokenize "y = 3x/2 + 7"
-    print $ tokenize "y = ln x"
+    print $ tokenize "double result = 1 + 4 / x;"
+    print $ tokenize "bool not_x = !x;"
+    print $ tokenize "float y=8^2;"
+    print $ tokenize "float y = 3x/2 + 7;"
+    print $ tokenize "double y = ln x;"
     print $ tokenize "x = 1;"
-    print $ alnums "R2D2+C3Po"
     print $ tokenize "int x = 3 * 5;"
