@@ -2,4 +2,4 @@
 
 CLS
 
-ghc -o hcc.exe -g -Werror main.hs
+ghc -o hcc.exe -g -Werror main.hs Lexer.hs
