@@ -269,12 +269,46 @@ parse toks =
         else
             error $ "Leftover tokens: " ++ show toks'
 
---evaluate :: Expression -> Double
---evaluate = undefined
+evaluate :: Tree -> Double
+evaluate (SumNode op left right) =
+    let 
+        lft = evaluate left
+        rgt = evaluate right
+    in
+        case op of
+            Plus -> lft + rgt
+            Minus -> lft - rgt
+
+evaluate (ProductNode op left right) =
+    let
+        lft = evaluate left
+        rgt = evaluate right
+    in
+        case op of
+            Times -> lft * rgt
+            Div -> lft / rgt
+
+evaluate (UnaryNode op tree) =
+    let
+        x = evaluate tree
+    in
+        case op of
+            Plus -> x
+            Minus -> (-x)
+
+evaluate (NumberNode x) = x
+
+-- Dummy Implementation
+evaluate (AssignmentNode str tree) = evaluate tree
+
+-- Dummy Implementation
+evaluate (VariableNode str) = 0
+
+
 
 
 main :: IO ()
-main = (print . parse. tokenize) "x1 = -15 / (2 + x2)"
+main = (print . evaluate . parse. tokenize) "x1 = -15 / (2 + x2)"
 
     -- print $ tokenize "double result = 1 + 4 / x;"
     -- print $ tokenize "bool not_x = !x;"
