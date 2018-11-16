@@ -1,0 +1,18 @@
+
+digraph {
+    
+    Start -> Letter
+    [label = "Identifier"]
+    
+    Start -> Number
+    [label = "Number"]
+
+    Letter -> Letter
+    Letter -> Space
+
+    Number -> Number
+    Number -> Space
+
+    Space
+
+}

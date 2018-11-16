@@ -17,7 +17,6 @@ data Operator = Plus
               | Modulo
               | Negation
               | Exponentiation
-              | Assignment
         deriving (Show, Eq)
 
 operator :: Char -> Operator
@@ -28,7 +27,6 @@ operator c | c == '+' = Plus
            | c == '%' = Modulo
            | c == '!' = Negation
            | c == '^' = Exponentiation
-           | c == '=' = Assignment
            | otherwise = error $ "Unknown operator input: " ++ [c]
 
 operatorToString :: Operator -> String
@@ -39,34 +37,89 @@ operatorToString Div            = "/"
 operatorToString Modulo         = "%"
 operatorToString Negation       = "!"
 operatorToString Exponentiation = "^"
-operatorToString Assignment     = "="
 
-data Token = TokenOperator Operator
-           | TokenIdentifier String
-           | TokenNumber Int
+data DataType = TypeInt
+              | TypeChar
+              | TypeFloat
+              | TypeDouble
+              | TypeVoid
         deriving (Show, Eq)
 
-showOperatorContent :: Token -> String
-showOperatorContent (TokenOperator op) = operatorToString op
-showOperatorContent (TokenIdentifier str) = str
-showOperatorContent (TokenNumber n) = show n
+datatype :: String -> DataType
+datatype str
+    | str == "int"      = TypeInt
+    | str == "char"     = TypeChar
+    | str == "float"    = TypeFloat
+    | str == "double"   = TypeDouble
+    | str == "void"     = TypeVoid
+    | otherwise         = error $ "Unknown data type: " ++ str
 
-data Expression
+showDataType :: DataType -> String
+showDataType TypeInt    = "int"
+showDataType TypeChar   = "char"
+showDataType TypeFloat  = "float"
+showDataType TypeDouble = "double"
+showDataType TypeVoid   = "void"
+    
+data Token = TokenOperator Operator
+           | TokenIdentifier String
+           | TokenDataType DataType
+           | TokenNumber Int
+           | TokenLeftParen
+           | TokenRightParen
+           | TokenEndOfLine
+           | TokenAssignment
+        deriving (Show, Eq)
+
+showTokenContent :: Token -> String
+showTokenContent (TokenOperator op) = operatorToString op
+showTokenContent (TokenIdentifier str) = str
+showTokenContent (TokenNumber n) = show n
+showTokenContent TokenLeftParen = show "("
+showTokenContent TokenRightParen = show ")"
+showTokenContent TokenEndOfLine = show ';'
+showTokenContent TokenAssignment = show '='
+showTokenContent (TokenDataType t) = showDataType t
+
+--data Expression
+
+alnums :: String -> (String, String)
+alnums str = als "" str
+    where
+        als acc [] = (acc, [])
+        als acc (c:cs)  | isAlphaNum c =
+                            let (acc', cs') = als acc cs
+                            in (c:acc', cs')
+                        | otherwise = (acc, c:cs)
+
+identifier :: Char -> String -> [Token]
+identifier c cs =
+    let
+        (str, cs') = alnums cs
+    in
+        if elem (c:str) ["int","char","float","double","void"] then
+            TokenDataType (datatype (c:str)) : tokenize cs'
+        else
+            TokenIdentifier (c:str) : tokenize cs'
 
 tokenize :: String -> [Token]
 tokenize [] = []
 tokenize (c:cs)
-    | elem c "+/*/%!^=" = TokenOperator (operator c) : tokenize cs
+    | elem c "+/*/%!^()" = TokenOperator (operator c) : tokenize cs
+    | c == ';' = TokenEndOfLine : tokenize cs
+    | c == '(' = TokenLeftParen : tokenize cs
+    | c == ')' = TokenRightParen : tokenize cs
+    | c == '=' = TokenAssignment : tokenize cs
     | isDigit c = TokenNumber (digitToInt c) : tokenize cs
-    | isAlpha c = TokenIdentifier [c] : tokenize cs
+    | isAlpha c = identifier c cs
     | isSpace c = tokenize cs
     | otherwise = error $ "Cannot tokenize " ++ [c]
 
-parse :: [Token] -> Expression
-parse = undefined
+--parse :: [Token] -> Expression
+--parse = undefined
 
-evaluate :: Expression -> Double
-evaluate = undefined
+--evaluate :: Expression -> Double
+--evaluate = undefined
 
 --
 
@@ -77,3 +130,6 @@ main = do
     print $ tokenize "y=8^2"
     print $ tokenize "y = 3x/2 + 7"
     print $ tokenize "y = ln x"
+    print $ tokenize "x = 1;"
+    print $ alnums "R2D2+C3Po"
+    print $ tokenize "int x = 3 * 5;"
