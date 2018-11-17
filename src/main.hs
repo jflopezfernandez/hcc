@@ -247,11 +247,14 @@ factor toks =
     case lookAtNextToken toks of
         (TokenNumber n) -> (NumberNode n, acceptToken toks)
         (TokenIdentifier str) -> (VariableNode str, acceptToken toks)
-        (TokenOperator op) | elem op [Plus, Minus] ->
-            let (facTree, toks') = factor (acceptToken toks)
-            in (UnaryNode op facTree, toks')
+        (TokenOperator op) | elem op [Plus, Minus, Negation] ->
+            let
+                (facTree, toks') = factor (acceptToken toks)
+            in
+                (UnaryNode op facTree, toks')
         TokenLeftParen ->
-            let (expTree, toks') = expression (acceptToken toks)
+            let
+                (expTree, toks') = expression (acceptToken toks)
             in
                 if lookAtNextToken toks' /= TokenRightParen then
                     error "Missing right parenthesis"
