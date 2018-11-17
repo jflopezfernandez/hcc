@@ -4,6 +4,7 @@ module Main where
 import System.IO
 import System.Environment
 import Data.Char
+import qualified Data.Map as DataMap
 -- import Control.Monad
 -- import Text.Parsec
 -- import Text.Parsec.Expr
@@ -19,19 +20,22 @@ data Operator = Plus
               | Exponentiation
               | LessThan
               | GreaterThan
+              | SizeOf
         deriving (Show, Eq)
 
-operator :: Char -> Operator
-operator c | c == '+' = Plus
-           | c == '-' = Minus
-           | c == '*' = Times
-           | c == '/' = Div
-           | c == '%' = Modulo
-           | c == '!' = Negation
-           | c == '^' = Exponentiation
-           | c == '<' = LessThan
-           | c == '>' = GreaterThan
-           | otherwise = error $ "Unknown operator input: " ++ [c]
+operator :: [Char] -> Operator
+operator [c] | c == '+' = Plus
+             | c == '-' = Minus
+             | c == '*' = Times
+             | c == '/' = Div
+             | c == '%' = Modulo
+             | c == '!' = Negation
+             | c == '^' = Exponentiation
+             | c == '<' = LessThan
+             | c == '>' = GreaterThan
+
+operator str | str == "sizeof" = SizeOf
+             | otherwise = error $ "Unknown operator input: " ++ str
 
 operatorToString :: Operator -> String
 operatorToString Plus           = "+"
@@ -43,6 +47,7 @@ operatorToString Negation       = "!"
 operatorToString Exponentiation = "^"
 operatorToString LessThan       = "<"
 operatorToString GreaterThan    = ">"
+operatorToString SizeOf         = "sizeof"
 
 data DataType = TypeInt
               | TypeChar
@@ -187,7 +192,7 @@ directive c cs =
 tokenize :: String -> [Token]
 tokenize [] = []
 tokenize (c:cs)
-    | elem c "+-/*/%!^" = TokenOperator (operator c) : tokenize cs
+    | elem c "+-/*/%!^" = TokenOperator (operator [c]) : tokenize cs
     | c == ';' = TokenEndOfLine : tokenize cs
     | c == '(' = TokenLeftParen : tokenize cs
     | c == ')' = TokenRightParen : tokenize cs
@@ -198,12 +203,15 @@ tokenize (c:cs)
     | isSpace c = tokenize cs
     | otherwise = error $ "Cannot tokenize " ++ [c]
 
+type SymbolTable = DataMap.Map String Double
+
 data Tree = VariableNode String
           | NumberNode Double
           | AssignmentNode String Tree
           | ProductNode Operator Tree Tree
           | SumNode Operator Tree Tree
           | UnaryNode Operator Tree
+          | DeclarationNode DataType Tree
         deriving (Show, Eq)
 
 expression :: [Token] -> (Tree, [Token])
@@ -267,48 +275,102 @@ parse toks =
         if null toks' then
             tree
         else
-            error $ "Leftover tokens: " ++ show toks'
+            if elem (lookAtNextToken toks') [TokenEndOfLine] then
+                tree
+            else
+                error $ "Leftover tokens: " ++ show toks'
 
-evaluate :: Tree -> Double
-evaluate (SumNode op left right) =
-    let 
-        lft = evaluate left
-        rgt = evaluate right
-    in
-        case op of
-            Plus -> lft + rgt
-            Minus -> lft - rgt
+lookUp :: String -> SymbolTable -> (Double, SymbolTable)
+lookUp str symbolTable =
+    case DataMap.lookup str symbolTable of
+        Just v -> (v, symbolTable)
+        Nothing -> error $ "Undefined variable: " ++ str
 
-evaluate (ProductNode op left right) =
+addSymbol :: String -> Double -> SymbolTable -> ((), SymbolTable)
+addSymbol str val symbolTable =
     let
-        lft = evaluate left
-        rgt = evaluate right
+        symbolTable' = DataMap.insert str val symbolTable
     in
-        case op of
-            Times -> lft * rgt
-            Div -> lft / rgt
+        ((), symbolTable')
 
-evaluate (UnaryNode op tree) =
+evaluate :: Tree -> SymbolTable -> (Double, SymbolTable)
+evaluate (SumNode op left right) symbolTable =
     let
-        x = evaluate tree
+        (lft, symbolTable')  = evaluate left symbolTable
+        (rgt, symbolTable'') = evaluate right symbolTable'
     in
         case op of
-            Plus -> x
-            Minus -> (-x)
+            Plus ->  (lft + rgt, symbolTable'')
+            Minus -> (lft - rgt, symbolTable'')
 
-evaluate (NumberNode x) = x
+evaluate (ProductNode op left right) symbolTable =
+    let
+        (lft, symbolTable') = evaluate left symbolTable
+        (rgt, symbolTable'') = evaluate right symbolTable'
+    in
+        case op of
+            Times -> (lft * rgt, symbolTable)
+            Div -> (lft / rgt, symbolTable)
 
--- Dummy Implementation
-evaluate (AssignmentNode str tree) = evaluate tree
+evaluate (UnaryNode op tree) symbolTable =
+    let
+        (x, symbolTable') = evaluate tree symbolTable
+    in
+        case op of
+            Plus -> (x, symbolTable')
+            Minus -> ((-x), symbolTable')
+            Negation -> ((-x), symbolTable')
 
--- Dummy Implementation
-evaluate (VariableNode str) = 0
+evaluate (NumberNode x) symbolTable = (x, symbolTable)
+
+evaluate (VariableNode str) symbolTable = lookUp str symbolTable
+
+evaluate (AssignmentNode str tree) symbolTable =
+    let
+        (v, symbolTable')  = evaluate tree symbolTable
+        (_, symbolTable'') = addSymbol str v symbolTable'
+    in
+        (v, symbolTable'')
+    
+-- evaluate (DeclarationNode t tree) symbolTable =
+--     let
+--         (t, symbolTable') = evaluate tree symbolTable
+--     in
+--         case t of
+--             TypeInt -> (t + 1000, symbolTable')
+--             _ -> (13004, symbolTable')
 
 
+simpleExample :: String
+simpleExample = "x = 4 * 8;"
+
+loop symbolTable = do
+    str <- getLine
+    if null str then
+        return ()
+    else
+        let
+            toks = tokenize str
+            tree = parse toks
+            (val, symbolTable') = evaluate tree symbolTable
+        in
+            do
+                print val
+                loop symbolTable'
 
 
 main :: IO ()
-main = (print . evaluate . parse. tokenize) "x1 = -15 / (2 + x2)"
+main = do
+    loop (DataMap.fromList [("pi", pi),("e",exp 1.0)])
+
+    --(print . parse . tokenize) simpleExample
+    --(print . evaluate . parse . tokenize) simpleExample
+    
+    --(print . parse . tokenize) "int x = 4 * 8;"
+
+    --(print . evaluate . parse . tokenize) "x1 = -15 / (2 + x2)"
+    --(print . evaluate . parse . tokenize) "x + 3 = 7"
+    --(print . evaluate . parse . tokenize) "int x = 1 + 4;"
 
     -- print $ tokenize "double result = 1 + 4 / x;"
     -- print $ tokenize "bool not_x = !x;"
