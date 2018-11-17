@@ -3,9 +3,24 @@ module Evaluator (evaluate) where
 
 import Lexer
 import Parser
+import Control.Applicative
+import Control.Monad
 import qualified Data.Map as DataMap
 
 type SymbolTable = DataMap.Map String Double
+
+newtype Evaluator a = Ev (Either String a)
+
+instance Monad Evaluator where
+    (Ev ev) >>= k =
+        case ev of
+            Left msg -> Ev (Left msg)
+            Right v -> k v
+    return v = Ev (Right v)
+    fail msg = Ev (Left msg)
+
+--instance Functor Evaluator where
+--    fmap
 
 lookUp :: String -> SymbolTable -> (Double, SymbolTable)
 lookUp str symbolTable =
@@ -13,22 +28,33 @@ lookUp str symbolTable =
         Just v -> (v, symbolTable)
         Nothing -> error $ "Undefined variable: " ++ str
 
-addSymbol :: String -> Double -> SymbolTable -> ((), SymbolTable)
+addSymbol :: String -> Double -> SymbolTable -> Either String ((), SymbolTable)
 addSymbol str val symbolTable =
     let
         symbolTable' = DataMap.insert str val symbolTable
     in
         ((), symbolTable')
 
-evaluate :: Tree -> SymbolTable -> (Double, SymbolTable)
+evaluate :: Tree -> SymbolTable -> Evaluator (Double, SymbolTable)
+
+{- 
 evaluate (SumNode op left right) symbolTable =
-    let
-        (lft, symbolTable')  = evaluate left symbolTable
-        (rgt, symbolTable'') = evaluate right symbolTable'
-    in
-        case op of
-            Plus ->  (lft + rgt, symbolTable'')
-            Minus -> (lft - rgt, symbolTable'')
+    evaluate left symbolTable >>= \(lft, symbolTable') ->
+        evaluate right symbolTable' >>= \(rgt, symbolTable'') ->
+            case op of
+                Plus ->  return (lft + rgt, symbolTable'')
+                Minus -> return (lft - rgt, symbolTable'')
+
+Equivalent to the code below.
+
+-}
+
+evaluate (SumNode op left right) symbolTable = do
+    (lft, symbolTable')  <- evaluate left symbolTable
+    (rgt, symbolTable'') <- evaluate right symbolTable'
+    case op of
+        Plus  -> return (lft + rgt, symbolTable'')
+        Minus -> return (lft - rgt, symbolTable'')
 
 evaluate (ProductNode op left right) symbolTable =
     let
