@@ -1,62 +1,63 @@
 
 module Main where
 
-import Lexer (tokenize)
-import Parser (parse)
-import Evaluator (evaluate)
+--import Lexer (tokenize)
+--import Parser (parse)
+--import Evaluator (evaluate)
 
-import System.IO
-import System.Environment
+-- import System.IO
+-- import System.Environment
 import Data.Char
-import qualified Data.Map as DataMap
+-- import qualified Data.Map as DataMap
 
+-- TODO: Constant constructor can only handle single-character integers
+-- TODO: Add enumeration constants
+data Constant = IntegerConstant Int
+              | CharacterConstant Char
+              | FloatingConstant Double
+        deriving (Show, Eq)
 
-simpleExample :: String
-simpleExample = "x = 4 * 8;"
+constant :: Char -> Constant
+constant c | c >= '0' && c <= '9' = IntegerConstant (digitToInt c)
+           | otherwise         = error $ "Unknown input"
 
-loop symbolTable = do
-    str <- getLine
-    if null str then
-        return ()
-    else
-        let
-            toks = tokenize str
-            tree = parse toks
-            (val, symbolTable') = evaluate tree symbolTable
-        in
-            do
-                print val
-                loop symbolTable'
+constantToString :: Constant -> String
+constantToString (IntegerConstant c) = show c
+constantToString (CharacterConstant c) = [c]
+constantToString (FloatingConstant c) = show c
 
+data Operator = OperatorPlus
+              | OperatorMinus
+              | OperatorTimes
+              | OperatorDiv
+              | OperatorModulo
+        deriving (Show, Eq)
+
+operator :: String -> Operator
+operator str | str == "+" = OperatorPlus
+             | otherwise = error $ "Unknown operator"
+
+operatorToString :: Operator -> String
+operatorToString op | op == OperatorPlus = "+"
+                    | otherwise = error $ "Unknown operator"
+
+data Token = TokenIdentifier String
+           | TokenConstant Constant
+           | TokenOperator Operator
+        deriving (Show, Eq)
+
+token :: Token
+token = TokenIdentifier "a"
+
+showTokenContent :: Token -> String
+showTokenContent (TokenIdentifier str) = str
+showTokenContent (TokenConstant c) = constantToString c
+showTokenContent (TokenOperator op) = operatorToString op
+
+tokenize :: String -> [Token]
+tokenize = undefined
 
 main :: IO ()
 main = do
-    loop (DataMap.fromList [("pi", pi),("e",exp 1.0)])
-
-    --(print . parse . tokenize) simpleExample
-    --(print . evaluate . parse . tokenize) simpleExample
-    
-    --(print . parse . tokenize) "int x = 4 * 8;"
-
-    --(print . evaluate . parse . tokenize) "x1 = -15 / (2 + x2)"
-    --(print . evaluate . parse . tokenize) "x + 3 = 7"
-    --(print . evaluate . parse . tokenize) "int x = 1 + 4;"
-
-    -- print $ tokenize "double result = 1 + 4 / x;"
-    -- print $ tokenize "bool not_x = !x;"
-    -- print $ tokenize "float y=8^2;"
-    -- print $ tokenize "float y = 3x/2 + 7;"
-    -- print $ tokenize "double y = ln x;"
-    -- print $ tokenize "x = 1;"
-    -- print $ tokenize "int x = 3 * 5;"
-    -- print $ tokenize "#include iostream"
-    -- print $ alnums "main()"
-    -- print $ tokenize "void printSomething();"
-
---  AssignmentNode "x1"
---      (ProductNode Div
---          (UnaryNode Minus
---              (NumberNode 15.0))
---          (SumNode Plus
---              (NumberNode 2.0)
---              (VariableNode "x2")))
+    print $ constant '3'
+    print $ operator "+"
