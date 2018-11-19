@@ -356,13 +356,14 @@ expression tokens =
                 in
                     (AdditiveExpressionNode op termTree exTree, tokens'')
             
-            (TokenOperator op) | op == TokenOperator ->
-                case termTree of
-                    IdentifierNode str ->
-                        let (exTree, tokens'') = expression (acceptToken tokens')
-                        in (AssignmentNode str exTree, tokens'')
+            -- ERROR: Can't figure out how to check a particular type constructor
+            -- (TokenOperator op) | op == TokenOperator ->
+            --     case termTree of
+            --         IdentifierNode str ->
+            --             let (exTree, tokens'') = expression (acceptToken tokens')
+            --             in (AssignmentNode str exTree, tokens'')
                     
-                    _ -> error $ "Only lvalues may be assigned to"
+            --         _ -> error $ "Only lvalues may be assigned to"
             
             _ -> (termTree, tokens')
 
@@ -424,5 +425,6 @@ main = do
     (print . parse . tokenize) "a * 4"
     (print . parse . tokenize) "a * (b + c)"
     (print . tokenize) "a = 4 + b"
-    (print . parse . tokenize) "a = 4 + b"
+    (print . tokenize) "int a = (4 * (2 + b));"
+    --(print . parse . tokenize) "a = 4 + b" -- Error
     --(print . parse . tokenize) "a = -b" -- Error
