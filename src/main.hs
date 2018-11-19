@@ -128,9 +128,9 @@ data TypeQualifier = TypeVoid
                    | TypeLong
                    | TypeFloat
                    | TypeDouble
+                   | TypeBoolean
                    | TypeSigned
                    | TypeUnsigned
-                   | TypeTypeDef
         deriving (Show, Eq)
 
 typeQualifier :: String -> TypeQualifier
@@ -141,9 +141,9 @@ typeQualifier str | str == "void"     = TypeVoid
                   | str == "long"     = TypeLong
                   | str == "float"    = TypeFloat
                   | str == "double"   = TypeDouble
+                  | str == "bool"     = TypeBoolean
                   | str == "signed"   = TypeSigned
                   | str == "unsigned" = TypeUnsigned
-                  | str == "typedef"  = TypeTypeDef
                   | otherwise         = error $ "Unknown type qualifier: " ++ str
 
 typeQualifierToString :: TypeQualifier -> String
@@ -154,30 +154,65 @@ typeQualifierToString t | t == TypeVoid = "void"
                         | t == TypeLong = "long"
                         | t == TypeFloat = "float"
                         | t == TypeDouble = "double"
+                        | t == TypeBoolean = "bool"
                         | t == TypeSigned = "signed"
                         | t == TypeUnsigned = "unsigned"
-                        | t == TypeTypeDef = "typedef"
                         | otherwise = error $ "Unknown type qualifier"
 
 listTypeQualifiers :: [String]
-listTypeQualifiers = ["void","char","short","int","long","float","double","signed","unsigned","typedef"]
+listTypeQualifiers = ["void","char","short","int","long","float","double","bool","signed","unsigned"]
+
+data StorageClassSpecifier = StorageClassAuto
+                           | StorageClassRegister
+                           | StorageClassStatic
+                           | StorageClassExtern
+                           | StorageClassTypedef
+        deriving (Show, Eq)
+
+storageClassSpecifier :: String -> StorageClassSpecifier
+storageClassSpecifier str | str == "auto"       = StorageClassAuto
+                          | str == "register"   = StorageClassRegister
+                          | str == "static"     = StorageClassStatic
+                          | str == "extern"     = StorageClassExtern
+                          | str == "typedef"    = StorageClassTypedef
+                          | otherwise           = error $ "Storage class specifier unknown: " ++ str
+
+storageClassSpecifierToString :: StorageClassSpecifier -> String
+storageClassSpecifierToString str | str == StorageClassAuto     = "auto"
+                                  | str == StorageClassRegister = "register"
+                                  | str == StorageClassStatic   = "static"
+                                  | str == StorageClassExtern   = "extern"
+                                  | str == StorageClassTypedef  = "typedef"
+                                  | otherwise                   = error $ "Storage class specifier unknown"
+
+listStorageTypeSpecifiers :: [String]
+listStorageTypeSpecifiers = ["auto","register","static","extern","typedef"]
 
 data Token = TokenIdentifier String
            | TokenConstant Constant
            | TokenOperator Operator
            | TokenTypeQualifier TypeQualifier
+           | TokenStorageClassSpecifier StorageClassSpecifier
+           | TokenLeftParen
+           | TokenRightParen
+           | TokenLeftBracket
+           | TokenRightBracket
            | TokenEndOfLine
+           | TokenEndOfInput
         deriving (Show, Eq)
-
-token :: Token
-token = TokenIdentifier "a"
 
 showTokenContent :: Token -> String
 showTokenContent (TokenIdentifier str) = str
 showTokenContent (TokenConstant c) = constantToString c
 showTokenContent (TokenOperator op) = operatorToString op
 showTokenContent (TokenTypeQualifier t) = typeQualifierToString t
+showTokenContent (TokenStorageClassSpecifier s) = storageClassSpecifierToString s
+showTokenContent TokenLeftParen = "("
+showTokenContent TokenRightParen = ")"
+showTokenContent TokenLeftBracket = "{"
+showTokenContent TokenRightBracket = "}"
 showTokenContent TokenEndOfLine = show ";"
+showTokenContent TokenEndOfInput = show "[End of Input.]"
 
 -- TODO: Implement sym function
 sym :: String -> (String, String)
@@ -228,15 +263,26 @@ alnums str = als "" str
                 in (c:acc', cs')
             | otherwise = (acc, c:cs)
 
+buildIdentifierToken :: Int -> String -> Token
+buildIdentifierToken i str | i == 1     = TokenTypeQualifier (typeQualifier str)
+                           | i == 2     = TokenStorageClassSpecifier (storageClassSpecifier str)
+                           | otherwise  = TokenIdentifier str
+
+idmatcher :: String -> Int
+idmatcher str | elem str listTypeQualifiers = 1
+              | elem str listStorageTypeSpecifiers = 2
+              | otherwise = 0
+
 identifier :: Char -> String -> [Token]
 identifier c cs =
     let
         (str, cs') = alnums cs
     in
-        if elem (c:str) listTypeQualifiers then
-            TokenTypeQualifier (typeQualifier (c:str)) : tokenize cs'
-        else
-            TokenIdentifier (c:str) : tokenize cs'
+        buildIdentifierToken (idmatcher (c:str)) (c:str) : tokenize cs'
+        -- if elem (c:str) listTypeQualifiers then
+        --     TokenTypeQualifier (typeQualifier (c:str)) : tokenize cs'
+        -- else
+        --     TokenIdentifier (c:str) : tokenize cs'
 
 tokenize :: String -> [Token]
 tokenize [] = []
@@ -245,16 +291,39 @@ tokenize (c : cs)
     | isDigit c = number c cs
     | elem c "+-*/%!=&|<>^" = symbol c cs
     | isSpace c = tokenize cs
+    | c == '(' = TokenLeftParen : tokenize cs
+    | c == ')' = TokenRightParen : tokenize cs
+    | c == '{' = TokenLeftBracket : tokenize cs
+    | c == '}' = TokenRightBracket : tokenize cs
     | c == ';' = TokenEndOfLine : tokenize cs
     | otherwise = error $ "Unknown input: " ++ [c]
 
+data Tree = VariableNode String
+          | IntegerNode Int
+          | AssignmentNode
+        deriving (Show, Eq)
+
+lookAtNextToken :: [Token] -> Token
+lookAtNextToken [] = TokenEndOfInput
+lookAtNextToken (c:_) = c
+
+acceptToken :: [Token] -> [Token]
+acceptToken [] = error $ "Nothing to accept"
+acceptToken (_:ts) = ts
+
+expression :: [Token] -> (Tree, [Token])
+expression = undefined
+
+term :: [Token] -> (Tree, [Token])
+term = undefined
+
+factor :: [Token] -> (Tree, [Token])
+factor = undefined
+
 main :: IO ()
 main = do
-    print $ constant "3"
-    print $ operator "+"
-    print $ tokenize "+3"
-    print $ tokenize "3 + 2 + 1"
-    print $ tokenize "3 = 3"
-    print $ tokenize "2 == 2"
-    print $ tokenize "27 != 483"
     print $ tokenize "int a = 300;"
+    print $ tokenize "int b = (4 * a);"
+    print $ tokenize "int main() { return 0; }"
+    print $ tokenize "static int x = 1;"
+    print $ tokenize "extern void data();"

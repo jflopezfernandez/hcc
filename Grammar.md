@@ -1,7 +1,7 @@
 
 # C Language Grammar
 
-This is the grammar listed in the C Programming Language book (2nd Edition) by Brian Kernighan and Dennis Ritchie.
+This is the grammar listed in the C Programming Language book (2nd Edition) by Brian Kernighan and Dennis Ritchie. I've also made some customizations, such as adding native `bool` type recognition.
 
 > Note: an asterisk on an item indicates it is optional.
 
@@ -33,7 +33,7 @@ storage-class-specifier: one of
     auto register static extern typedef
 
 type-specifier: one of
-    void char short int long float double signed unsigned struct-or-union-specifier enum-specifier typedef-name
+    void char short int long float double bool signed unsigned struct-or-union-specifier enum-specifier typedef-name
 
 type-qualifier: one of
     const volatile
