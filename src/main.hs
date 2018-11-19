@@ -23,6 +23,10 @@ constant (c : cs) = IntegerConstant (read (c:cs))
     -- | c >= '0' && c <= '9' = IntegerConstant (digitToInt c)
     -- | otherwise         = error $ "Unknown input"
 
+isIntegerConstant :: Constant -> Bool
+isIntegerConstant (IntegerConstant _) = True
+isIntegerConstant _ = False
+
 constantToString :: Constant -> String
 constantToString (IntegerConstant c) = show c
 constantToString (CharacterConstant c) = [c]
@@ -89,6 +93,9 @@ data Operator = OperatorPlus
               | OperatorLogicalAnd
               | OperatorLogicalOr
         deriving (Show, Eq)
+
+-- TODO: In order to be able to handle pointer declarations and dereferencing,
+-- the handling of the '*' character will have to be made more robust.
 
 operator :: String -> Operator
 operator str | str == "+" = OperatorPlus
@@ -263,10 +270,33 @@ alnums str = als "" str
                 in (c:acc', cs')
             | otherwise = (acc, c:cs)
 
+-- Function: buildIdentifierToken
+--
+-- Description: This function takes the integer value from "idmatcher" as well
+-- as the string from "identifier" and calls the token constructor function
+-- based on the integer i.
+--
+-- 1: TokenStorageClassSpecifier
+-- 2: TokenTypeQualifier
+--
+-- If the value of i isn't explicitly listed (the default return of "idmatcher"
+-- is 0), then it simply constructs a generic TokenIdentifier object, which will
+-- usually represent variables, function names, etc.
+
 buildIdentifierToken :: Int -> String -> Token
 buildIdentifierToken i str | i == 1     = TokenTypeQualifier (typeQualifier str)
                            | i == 2     = TokenStorageClassSpecifier (storageClassSpecifier str)
                            | otherwise  = TokenIdentifier str
+
+-- Function: idmatcher
+--
+-- Description: Since there are several types of identifiers, ranging from user-
+-- specified identifiers to storage class specifiers and type qualifiers, I 
+-- wrote this function to classify the identifier type by searching for whether
+-- it exists in any of the predefined keyword lists. If it does, the function
+-- returns an integer value corresponding to the type of identifier it is, and
+-- the calling function "identifier" subsequently calls "buildIdentifierToken"
+-- to actually construct the Token.
 
 idmatcher :: String -> Int
 idmatcher str | elem str listTypeQualifiers = 1
@@ -298,9 +328,9 @@ tokenize (c : cs)
     | c == ';' = TokenEndOfLine : tokenize cs
     | otherwise = error $ "Unknown input: " ++ [c]
 
-data Tree = VariableNode String
-          | IntegerNode Int
-          | AssignmentNode
+data Tree = ConstantNode Constant
+          | IdentifierNode String
+          | AdditiveExpressionNode Operator Tree Tree
         deriving (Show, Eq)
 
 lookAtNextToken :: [Token] -> Token
@@ -311,19 +341,52 @@ acceptToken :: [Token] -> [Token]
 acceptToken [] = error $ "Nothing to accept"
 acceptToken (_:ts) = ts
 
-expression :: [Token] -> (Tree, [Token])
-expression = undefined
 
-term :: [Token] -> (Tree, [Token])
-term = undefined
 
-factor :: [Token] -> (Tree, [Token])
-factor = undefined
+parserPrimaryExpression :: [Token] -> (Tree, [Token])
+parserPrimaryExpression tokens =
+    let
+        (termTree, tokens') = parserConstant tokens
+    in
+        case lookAtNextToken tokens' of
+            (TokenOperator op) | elem op [OperatorPlus, OperatorMinus] ->
+                let
+                    (exTree, tokens'') = parserPrimaryExpression (acceptToken tokens')
+                in
+                    (AdditiveExpressionNode op termTree exTree, tokens'')
+            _ -> (termTree, tokens')
+
+parserConstant :: [Token] -> (Tree, [Token])
+parserConstant tokens =
+    let
+        (parseTree, tokens') = parserIdentifier tokens
+    in
+        case lookAtNextToken tokens of
+            (TokenConstant c) | isIntegerConstant c -> (ConstantNode c, acceptToken tokens)
+            _ -> (parseTree, tokens')
+
+parserIdentifier :: [Token] -> (Tree, [Token])
+parserIdentifier tokens =
+    case lookAtNextToken tokens of
+        (TokenIdentifier str) -> (IdentifierNode str, acceptToken tokens)
+        _ -> error $ "Unknown tokens: " ++ show tokens
+
+parse :: [Token] -> Tree
+parse tokens =
+    let
+        (tree, tokens') = parserPrimaryExpression tokens
+    in
+        if null tokens' then
+            tree
+        else
+            if lookAtNextToken tokens' == TokenEndOfLine then
+                tree
+            else
+                error $ "Leftover tokens: " ++ show tokens'
 
 main :: IO ()
 main = do
-    print $ tokenize "int a = 300;"
-    print $ tokenize "int b = (4 * a);"
-    print $ tokenize "int main() { return 0; }"
-    print $ tokenize "static int x = 1;"
-    print $ tokenize "extern void data();"
+    (print . parse . tokenize) "a"
+    (print . parse . tokenize) "15"
+    (print . parse . tokenize) "42 + 4"
+    (print . parse . tokenize) "408 - a"
