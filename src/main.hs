@@ -19,8 +19,9 @@ data Constant = IntegerConstant Int
 
 constant :: String -> Constant
 constant [] = error $ "No input"
-constant (c: _ ) | c >= '0' && c <= '9' = IntegerConstant (digitToInt c)
-                 | otherwise         = error $ "Unknown input"
+constant (c : cs) = IntegerConstant (read (c:cs))
+    -- | c >= '0' && c <= '9' = IntegerConstant (digitToInt c)
+    -- | otherwise         = error $ "Unknown input"
 
 constantToString :: Constant -> String
 constantToString (IntegerConstant c) = show c
@@ -116,6 +117,9 @@ operatorToString op | op == OperatorPlus = "+"
                     | op == OperatorModulo = "%"
                     | otherwise = error $ "Unknown operator"
 
+listOperators :: [String]
+listOperators = ["+","-","*","/","%","!","<",">","==","!=",">=","<=","|","&&","||"]
+
 data Token = TokenIdentifier String
            | TokenConstant Constant
            | TokenOperator Operator
@@ -147,12 +151,32 @@ symbol c cs =
     in
         TokenOperator (operator (c:str)) : tokenize cs'
 
+-- TODO: Implement double function
+--double :: String -> String -> (String, String)
+--double c cs = 
+
+-- TODO: Add type double functionality
+digits :: String -> (String, String)
+digits str = digs "" str
+    where
+        digs :: String -> String -> (String, String)
+        digs acc [] = (acc, [])
+        digs acc (c : cs)
+            | isDigit c = let (acc', cs') = digs acc cs
+                           in (c:acc', cs')
+            -- | c == '.' = 
+            | otherwise = (acc, c:cs)
+
+number :: Char -> String -> [Token]
+number c cs =
+    let (digs, cs') = digits cs
+    in TokenConstant (constant (c:digs)) : tokenize cs'
+
 tokenize :: String -> [Token]
 tokenize [] = []
 tokenize (c : cs)
-    | elem c "+" = TokenOperator (operator [c]) : tokenize cs
-    | isDigit c = TokenConstant (constant [c]) : tokenize cs
-    | isSymbol c = symbol c cs
+    | isDigit c = number c cs
+    | elem c "+-*/%!=&|<>^" = symbol c cs
     | isSpace c = tokenize cs
     | otherwise = error $ "Unknown input"
 
@@ -164,3 +188,4 @@ main = do
     print $ tokenize "3 + 2 + 1"
     print $ tokenize "3 = 3"
     print $ tokenize "2 == 2"
+    print $ tokenize "27 != 483"
