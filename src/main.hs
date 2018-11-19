@@ -120,9 +120,53 @@ operatorToString op | op == OperatorPlus = "+"
 listOperators :: [String]
 listOperators = ["+","-","*","/","%","!","<",">","==","!=",">=","<=","|","&&","||"]
 
+-- TODO: Implement struct-or-union-specifier and enum-specifier
+data TypeQualifier = TypeVoid
+                   | TypeChar
+                   | TypeShort
+                   | TypeInt
+                   | TypeLong
+                   | TypeFloat
+                   | TypeDouble
+                   | TypeSigned
+                   | TypeUnsigned
+                   | TypeTypeDef
+        deriving (Show, Eq)
+
+typeQualifier :: String -> TypeQualifier
+typeQualifier str | str == "void"     = TypeVoid
+                  | str == "char"     = TypeChar
+                  | str == "short"    = TypeShort
+                  | str == "int"      = TypeInt
+                  | str == "long"     = TypeLong
+                  | str == "float"    = TypeFloat
+                  | str == "double"   = TypeDouble
+                  | str == "signed"   = TypeSigned
+                  | str == "unsigned" = TypeUnsigned
+                  | str == "typedef"  = TypeTypeDef
+                  | otherwise         = error $ "Unknown type qualifier: " ++ str
+
+typeQualifierToString :: TypeQualifier -> String
+typeQualifierToString t | t == TypeVoid = "void"
+                        | t == TypeChar = "char"
+                        | t == TypeShort = "short"
+                        | t == TypeInt = "int"
+                        | t == TypeLong = "long"
+                        | t == TypeFloat = "float"
+                        | t == TypeDouble = "double"
+                        | t == TypeSigned = "signed"
+                        | t == TypeUnsigned = "unsigned"
+                        | t == TypeTypeDef = "typedef"
+                        | otherwise = error $ "Unknown type qualifier"
+
+listTypeQualifiers :: [String]
+listTypeQualifiers = ["void","char","short","int","long","float","double","signed","unsigned","typedef"]
+
 data Token = TokenIdentifier String
            | TokenConstant Constant
            | TokenOperator Operator
+           | TokenTypeQualifier TypeQualifier
+           | TokenEndOfLine
         deriving (Show, Eq)
 
 token :: Token
@@ -132,6 +176,8 @@ showTokenContent :: Token -> String
 showTokenContent (TokenIdentifier str) = str
 showTokenContent (TokenConstant c) = constantToString c
 showTokenContent (TokenOperator op) = operatorToString op
+showTokenContent (TokenTypeQualifier t) = typeQualifierToString t
+showTokenContent TokenEndOfLine = show ";"
 
 -- TODO: Implement sym function
 sym :: String -> (String, String)
@@ -172,13 +218,35 @@ number c cs =
     let (digs, cs') = digits cs
     in TokenConstant (constant (c:digs)) : tokenize cs'
 
+alnums :: String -> (String, String)
+alnums str = als "" str
+    where
+        als acc [] = (acc, [])
+        als acc (c:cs)
+            | isAlphaNum c =
+                let (acc', cs') = als acc cs
+                in (c:acc', cs')
+            | otherwise = (acc, c:cs)
+
+identifier :: Char -> String -> [Token]
+identifier c cs =
+    let
+        (str, cs') = alnums cs
+    in
+        if elem (c:str) listTypeQualifiers then
+            TokenTypeQualifier (typeQualifier (c:str)) : tokenize cs'
+        else
+            TokenIdentifier (c:str) : tokenize cs'
+
 tokenize :: String -> [Token]
 tokenize [] = []
 tokenize (c : cs)
+    | isAlpha c = identifier c cs
     | isDigit c = number c cs
     | elem c "+-*/%!=&|<>^" = symbol c cs
     | isSpace c = tokenize cs
-    | otherwise = error $ "Unknown input"
+    | c == ';' = TokenEndOfLine : tokenize cs
+    | otherwise = error $ "Unknown input: " ++ [c]
 
 main :: IO ()
 main = do
@@ -189,3 +257,4 @@ main = do
     print $ tokenize "3 = 3"
     print $ tokenize "2 == 2"
     print $ tokenize "27 != 483"
+    print $ tokenize "int a = 300;"
