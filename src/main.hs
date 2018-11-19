@@ -8,7 +8,6 @@ module Main where
 -- import System.IO
 -- import System.Environment
 import Data.Char
-import Data.DeriveTH
 -- import qualified Data.Map as DataMap
 
 -- TODO: Constant constructor can only handle single-character integers
