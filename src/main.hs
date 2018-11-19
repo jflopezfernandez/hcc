@@ -8,6 +8,7 @@ module Main where
 -- import System.IO
 -- import System.Environment
 import Data.Char
+import Data.DeriveTH
 -- import qualified Data.Map as DataMap
 
 -- TODO: Constant constructor can only handle single-character integers
@@ -330,7 +331,10 @@ tokenize (c : cs)
 
 data Tree = ConstantNode Constant
           | IdentifierNode String
+          | UnaryExpressionNode Operator Tree
           | AdditiveExpressionNode Operator Tree Tree
+          | MultiplicativeExpressionNode Operator Tree Tree
+          | AssignmentNode String Tree
         deriving (Show, Eq)
 
 lookAtNextToken :: [Token] -> Token
@@ -341,48 +345,75 @@ acceptToken :: [Token] -> [Token]
 acceptToken [] = error $ "Nothing to accept"
 acceptToken (_:ts) = ts
 
-
-
-parserPrimaryExpression :: [Token] -> (Tree, [Token])
-parserPrimaryExpression tokens =
+expression :: [Token] -> (Tree, [Token])
+expression tokens = 
     let
-        (termTree, tokens') = parserConstant tokens
+        (termTree, tokens') = term tokens
     in
         case lookAtNextToken tokens' of
             (TokenOperator op) | elem op [OperatorPlus, OperatorMinus] ->
                 let
-                    (exTree, tokens'') = parserPrimaryExpression (acceptToken tokens')
+                    (exTree, tokens'') = expression (acceptToken tokens')
                 in
                     (AdditiveExpressionNode op termTree exTree, tokens'')
+            
+            (TokenOperator op) | op == TokenOperator ->
+                case termTree of
+                    IdentifierNode str ->
+                        let (exTree, tokens'') = expression (acceptToken tokens')
+                        in (AssignmentNode str exTree, tokens'')
+                    
+                    _ -> error $ "Only lvalues may be assigned to"
+            
             _ -> (termTree, tokens')
 
-parserConstant :: [Token] -> (Tree, [Token])
-parserConstant tokens =
+term :: [Token] -> (Tree, [Token])
+term tokens = 
     let
-        (parseTree, tokens') = parserIdentifier tokens
+        (factorTree, tokens') = factor tokens
     in
-        case lookAtNextToken tokens of
-            (TokenConstant c) | isIntegerConstant c -> (ConstantNode c, acceptToken tokens)
-            _ -> (parseTree, tokens')
+        case lookAtNextToken tokens' of
+            (TokenOperator op) | elem op [OperatorTimes, OperatorDiv] ->
+                let
+                    (termTree, tokens'') = term (acceptToken tokens')
+                in
+                    (MultiplicativeExpressionNode op factorTree termTree, tokens'')
+            
+            _ -> (factorTree, tokens')
 
-parserIdentifier :: [Token] -> (Tree, [Token])
-parserIdentifier tokens =
+factor :: [Token] -> (Tree, [Token])
+factor tokens =
     case lookAtNextToken tokens of
+        (TokenConstant c) -> (ConstantNode c, acceptToken tokens)
+
         (TokenIdentifier str) -> (IdentifierNode str, acceptToken tokens)
-        _ -> error $ "Unknown tokens: " ++ show tokens
+
+        (TokenOperator op) | elem op [OperatorPlus, OperatorMinus] ->
+            let
+                (factorTree, tokens') = factor (acceptToken tokens)
+            in
+                (UnaryExpressionNode op factorTree, tokens')
+
+        TokenLeftParen ->
+            let
+                (expTree, tokens') = expression (acceptToken tokens)
+            in
+                if lookAtNextToken tokens' /= TokenRightParen then
+                    error $ "Missing right parenthesis"
+                else
+                    (expTree, acceptToken tokens')
+        
+        _ -> error $ "Parse error on token: " ++ show tokens
 
 parse :: [Token] -> Tree
 parse tokens =
     let
-        (tree, tokens') = parserPrimaryExpression tokens
+        (tree, tokens') = expression tokens
     in
         if null tokens' then
             tree
         else
-            if lookAtNextToken tokens' == TokenEndOfLine then
-                tree
-            else
-                error $ "Leftover tokens: " ++ show tokens'
+            error $ "Leftover tokens: " ++ show tokens
 
 main :: IO ()
 main = do
@@ -390,3 +421,9 @@ main = do
     (print . parse . tokenize) "15"
     (print . parse . tokenize) "42 + 4"
     (print . parse . tokenize) "408 - a"
+    (print . parse . tokenize) "-b"
+    (print . parse . tokenize) "a * 4"
+    (print . parse . tokenize) "a * (b + c)"
+    (print . tokenize) "a = 4 + b"
+    (print . parse . tokenize) "a = 4 + b"
+    --(print . parse . tokenize) "a = -b" -- Error
