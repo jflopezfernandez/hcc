@@ -17,6 +17,7 @@ operator op | op == "+" = Addition
 data Token = TokenIdentifier String
            | TokenInteger Int
            | TokenDouble Double
+           | TokenBoolean Bool
            | TokenOperator Operator
            | TokenDataTypeDeclaration String
            | TokenAssignment
@@ -32,6 +33,10 @@ listDataTypes = ["void","char","short","int","long","float","double","bool","sig
 classifyIdentifier :: String -> Token
 classifyIdentifier "" = error "No input string"
 classifyIdentifier s | elem s listDataTypes = TokenDataTypeDeclaration s
+                     | elem s ["true","false"] =
+                        case s of
+                            "true" -> TokenBoolean True
+                            _ -> TokenBoolean False
                      | otherwise = TokenIdentifier s
 
 identifier :: String -> String -> [Token]
