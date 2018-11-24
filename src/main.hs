@@ -33,17 +33,20 @@ identifier acc (x:xs)
     | isAlphaNum x = identifier (acc ++ [x]) xs
     | otherwise = TokenIdentifier acc : tokenize (x:xs)
 
-numeric :: String -> String -> [Token]
-numeric acc "" = TokenInteger (read acc) : tokenize ""
-numeric acc (x:xs)
-    | isDigit x = numeric (acc ++ [x]) xs
+numeric :: Bool -> String -> String -> [Token]
+numeric False acc "" = TokenInteger (read acc) : tokenize ""
+numeric True acc "" = TokenDouble (read acc) : tokenize ""
+numeric b acc (x:xs)
+    | isDigit x = numeric b (acc ++ [x]) xs
+    | x == '.' && b == False = numeric True (acc ++ [x]) xs
+    | x == '.' && b == True = error $ "Double period in number: " ++ acc ++ [x]
     | otherwise = TokenInteger (read acc) : tokenize xs
 
 tokenize :: String -> [Token]
 tokenize [] = []
 tokenize (x:xs)
     | isAlpha x = identifier "" (x:xs)
-    | isDigit x = numeric "" (x:xs)
+    | isDigit x = numeric False "" (x:xs)
     | isSpace x = tokenize xs
     | x == '=' = TokenAssignment : tokenize xs
     | x == '(' = TokenLeftParen : tokenize xs
